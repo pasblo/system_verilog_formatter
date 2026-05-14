@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from svformatter.config import RuntimeConfig
-from svformatter.models import FormatResult
+from .config import RuntimeConfig
+from .models import FormatResult
 
 
 FormatRule = Callable[[str, RuntimeConfig], tuple[str, bool]]

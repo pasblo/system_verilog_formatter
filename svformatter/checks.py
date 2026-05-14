@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
-from svformatter.config import RuntimeConfig
-from svformatter.models import Finding
+from .config import RuntimeConfig
+from .models import Finding
 
 
 DesignCheck = Callable[[Path, str, RuntimeConfig], list[Finding]]

@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from svformatter.config import RuntimeConfig
-from svformatter.models import Finding, FormatResult
+from .config import RuntimeConfig
+from .models import Finding, FormatResult
 
 
 def print_report(

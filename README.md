@@ -42,6 +42,14 @@ From the host project root:
 python scripts/system_verilog_formatter/svf.py
 ```
 
+Or run it as a Python module from the host project root:
+
+```bash
+python -m scripts.system_verilog_formatter.svf
+```
+
+Python module names use dots, so `python -m scripts/system_verilog_formatter/svf` is not valid.
+
 Useful options:
 
 | Option | Meaning |

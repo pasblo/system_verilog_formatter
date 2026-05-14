@@ -4,7 +4,7 @@ from fnmatch import fnmatch
 import os
 from pathlib import Path
 
-from svformatter.config import RuntimeConfig
+from .config import RuntimeConfig
 
 
 def discover_sv_files(runtime: RuntimeConfig) -> list[Path]:

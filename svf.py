@@ -4,11 +4,18 @@ import argparse
 import sys
 from pathlib import Path
 
-from svformatter.checks import run_checks
-from svformatter.config import resolve_runtime_config
-from svformatter.discovery import discover_sv_files
-from svformatter.formatter import format_file
-from svformatter.reporting import print_report
+if __package__:
+    from .svformatter.checks import run_checks
+    from .svformatter.config import resolve_runtime_config
+    from .svformatter.discovery import discover_sv_files
+    from .svformatter.formatter import format_file
+    from .svformatter.reporting import print_report
+else:
+    from svformatter.checks import run_checks
+    from svformatter.config import resolve_runtime_config
+    from svformatter.discovery import discover_sv_files
+    from svformatter.formatter import format_file
+    from svformatter.reporting import print_report
 
 
 def build_parser() -> argparse.ArgumentParser:

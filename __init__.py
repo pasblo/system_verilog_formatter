@@ -1,0 +1,1 @@
+"""SystemVerilog formatter automation package."""
