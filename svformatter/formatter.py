@@ -189,12 +189,15 @@ _NON_DECLARATION_PREFIXES = {
 }
 
 _UNSUPPORTED_DECLARATION_CHARS = set("=(){}")
+_PORT_DIRECTIONS = {"input", "output", "inout", "ref"}
 
 
 def align_declaration_groups(text: str, runtime: RuntimeConfig) -> tuple[str, bool]:
     lines = text.split("\n")
     output: list[str] = []
     group: list[DeclarationLine] = []
+    module_header: list[str] = []
+    in_module_header = False
 
     def flush_group() -> None:
         if group:
@@ -202,6 +205,24 @@ def align_declaration_groups(text: str, runtime: RuntimeConfig) -> tuple[str, bo
         group.clear()
 
     for line in lines:
+        if in_module_header:
+            module_header.append(line)
+            if _ends_module_header(line):
+                output.extend(_align_module_header(module_header, runtime.tab_size))
+                module_header.clear()
+                in_module_header = False
+            continue
+
+        if _starts_module_header(line):
+            flush_group()
+            module_header.append(line)
+            if _ends_module_header(line):
+                output.extend(_align_module_header(module_header, runtime.tab_size))
+                module_header.clear()
+            else:
+                in_module_header = True
+            continue
+
         declaration = _parse_declaration_line(line)
         if declaration is None:
             flush_group()
@@ -215,9 +236,61 @@ def align_declaration_groups(text: str, runtime: RuntimeConfig) -> tuple[str, bo
         group.append(declaration)
 
     flush_group()
+    if module_header:
+        output.extend(_align_module_header(module_header, runtime.tab_size))
 
     formatted = "\n".join(output)
     return formatted, formatted != text
+
+
+def _starts_module_header(line: str) -> bool:
+    return re.match(r"^\s*module\b", line) is not None
+
+
+def _ends_module_header(line: str) -> bool:
+    code, _comment = _split_line_comment(line)
+    stripped = code.strip()
+    return stripped.endswith(";") and (
+        stripped.startswith("module ")
+        or stripped.startswith("module\t")
+        or stripped == ");"
+        or stripped.endswith(");")
+    )
+
+
+def _align_module_header(lines: list[str], tab_size: int) -> list[str]:
+    ports: list[tuple[int, DeclarationLine]] = []
+    parameters: list[tuple[int, DeclarationLine]] = []
+
+    for index, line in enumerate(lines):
+        declaration = _parse_declaration_line(line)
+        if declaration is not None and declaration.kind == "declaration" and _is_port_declaration(declaration):
+            ports.append((index, declaration))
+        elif declaration is not None and declaration.kind == "parameter":
+            parameters.append((index, declaration))
+
+    aligned_lines = list(lines)
+    _replace_aligned_declarations(aligned_lines, parameters, tab_size)
+    _replace_aligned_declarations(aligned_lines, ports, tab_size)
+
+    return aligned_lines
+
+
+def _replace_aligned_declarations(
+    lines: list[str],
+    indexed_declarations: list[tuple[int, DeclarationLine]],
+    tab_size: int,
+) -> None:
+    if not indexed_declarations:
+        return
+
+    aligned = _align_declaration_group([declaration for _index, declaration in indexed_declarations], tab_size)
+    for (index, _declaration), aligned_line in zip(indexed_declarations, aligned):
+        lines[index] = aligned_line
+
+
+def _is_port_declaration(declaration: DeclarationLine) -> bool:
+    return declaration.declaration_type.split(None, 1)[0].lower() in _PORT_DIRECTIONS
 
 
 def _parse_declaration_line(line: str) -> DeclarationLine | None:
