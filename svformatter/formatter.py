@@ -136,6 +136,7 @@ _DECLARATION_PREFIXES = {
     "real",
     "realtime",
     "shortreal",
+    "parameter",
 }
 
 _NON_DECLARATION_PREFIXES = {
@@ -169,7 +170,6 @@ _NON_DECLARATION_PREFIXES = {
     "localparam",
     "module",
     "package",
-    "parameter",
     "return",
     "task",
     "typedef",
