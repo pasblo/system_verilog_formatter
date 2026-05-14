@@ -101,7 +101,6 @@ def limit_blank_lines(text: str, runtime: RuntimeConfig) -> tuple[str, bool]:
 
 @dataclass(frozen=True)
 class DeclarationLine:
-    original: str
     indent: str
     declaration_type: str
     name: str
@@ -186,9 +185,7 @@ def align_declaration_groups(text: str, runtime: RuntimeConfig) -> tuple[str, bo
     group: list[DeclarationLine] = []
 
     def flush_group() -> None:
-        if len(group) < 2:
-            output.extend(_render_declaration(line) for line in group)
-        else:
+        if group:
             output.extend(_align_declaration_group(group, runtime.tab_size))
         group.clear()
 
@@ -240,7 +237,6 @@ def _parse_declaration_line(line: str) -> DeclarationLine | None:
         return None
 
     return DeclarationLine(
-        original=line,
         indent=indent,
         declaration_type=declaration_type,
         name=name,
@@ -251,13 +247,13 @@ def _parse_declaration_line(line: str) -> DeclarationLine | None:
 
 def _align_declaration_group(group: list[DeclarationLine], tab_size: int) -> list[str]:
     type_width = max(len(line.declaration_type) for line in group)
-    name_column = _next_tab_stop(type_width + 1, tab_size)
+    name_column = _next_aligned_column(type_width, tab_size)
 
     declaration_widths = [
         name_column + len(line.name) + len(line.terminator)
         for line in group
     ]
-    comment_column = _next_tab_stop(max(declaration_widths) + 1, tab_size)
+    comment_column = _next_aligned_column(max(declaration_widths), tab_size)
 
     aligned: list[str] = []
     for line, declaration_width in zip(group, declaration_widths):
@@ -273,13 +269,17 @@ def _align_declaration_group(group: list[DeclarationLine], tab_size: int) -> lis
     return aligned
 
 
-def _render_declaration(line: DeclarationLine) -> str:
-    return line.original
-
-
 def _next_tab_stop(column: int, tab_size: int) -> int:
     tab = max(tab_size, 1)
     return ((column + tab - 1) // tab) * tab
+
+
+def _next_aligned_column(width: int, tab_size: int) -> int:
+    tab = max(tab_size, 1)
+    column = _next_tab_stop(width + 1, tab)
+    if column - width < 2:
+        column += tab
+    return column
 
 
 def _split_line_comment(content: str) -> tuple[str, str | None]:
