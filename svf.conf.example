@@ -1,0 +1,27 @@
+# Example system_verilog_formatter config
+# Place a copy of this file at: <project>/scripts/svf.conf
+
+[paths]
+# Paths are resolved relative to <project>/scripts
+TARGET_DIR = ../rtl
+
+[formatter]
+# Comma-separated without spaces
+HDL_EXTENSIONS = sv,svh,v
+EXCLUDE_FOLDERS = .git,__pycache__,build,dist,obj_dir
+# Optional file patterns, matched against either the file name or target-relative path
+EXCLUDE_GLOBS =
+
+# Current generic formatting settings. More SystemVerilog-specific rules will use
+# this same section as they are added.
+TAB_SIZE = 4
+EXPAND_TABS = false
+TRIM_TRAILING_WHITESPACE = true
+FINAL_NEWLINE = true
+# 0 disables blank-line limiting
+MAX_CONSECUTIVE_BLANK_LINES = 0
+# preserve, lf, or crlf
+LINE_ENDING = preserve
+
+[checks]
+# Custom design-decision checks will be added in svformatter/checks.py.
