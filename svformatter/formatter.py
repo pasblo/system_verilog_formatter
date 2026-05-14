@@ -252,8 +252,6 @@ def _parse_declaration_line(line: str) -> DeclarationLine | None:
 def _align_declaration_group(group: list[DeclarationLine], tab_size: int) -> list[str]:
     type_width = max(len(line.declaration_type) for line in group)
     name_column = _next_tab_stop(type_width + 1, tab_size)
-    if any(_first_type_token(line) in {"input", "output", "inout", "ref"} for line in group):
-        name_column = max(name_column, _next_tab_stop(24, tab_size))
 
     declaration_widths = [
         name_column + len(line.name) + len(line.terminator)
@@ -277,10 +275,6 @@ def _align_declaration_group(group: list[DeclarationLine], tab_size: int) -> lis
 
 def _render_declaration(line: DeclarationLine) -> str:
     return line.original
-
-
-def _first_type_token(line: DeclarationLine) -> str:
-    return line.declaration_type.split(None, 1)[0].lower()
 
 
 def _next_tab_stop(column: int, tab_size: int) -> int:
