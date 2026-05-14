@@ -101,17 +101,30 @@ def limit_blank_lines(text: str, runtime: RuntimeConfig) -> tuple[str, bool]:
 
 @dataclass(frozen=True)
 class DeclarationLine:
+    kind: str
     indent: str
     declaration_type: str
     name: str
-    terminator: str
+    tail: str
     comment: str | None
 
 
 _DECLARATION_RE = re.compile(
     r"^(?P<type>.+?)\s+"
     r"(?P<name>[A-Za-z_][A-Za-z0-9_$]*(?:\s*\[[^\]]+\])*)"
-    r"\s*(?P<terminator>[,;]?)$"
+    r"\s*(?P<tail>[,;]?)$"
+)
+
+_PARAMETER_RE = re.compile(
+    r"^(?P<type>(?:localparam|parameter)(?:\s+.+?)?)\s+"
+    r"(?P<name>[A-Za-z_][A-Za-z0-9_$]*)"
+    r"\s*(?P<tail>=\s*.*?[,;]?)$"
+)
+
+_ASSIGN_RE = re.compile(
+    r"^(?P<type>assign)\s+"
+    r"(?P<name>[A-Za-z_][A-Za-z0-9_$]*(?:\s*\[[^\]]+\])*)"
+    r"\s*(?P<tail>=\s*.*?;?)$"
 )
 
 _DECLARATION_PREFIXES = {
@@ -136,8 +149,7 @@ _DECLARATION_PREFIXES = {
     "real",
     "realtime",
     "shortreal",
-    "parameter",
-    "assign",
+    "localparam",
 }
 
 _NON_DECLARATION_PREFIXES = {
@@ -167,9 +179,9 @@ _NON_DECLARATION_PREFIXES = {
     "if",
     "import",
     "initial",
-    "localparam",
     "module",
     "package",
+    "parameter",
     "return",
     "task",
     "typedef",
@@ -198,6 +210,8 @@ def align_declaration_groups(text: str, runtime: RuntimeConfig) -> tuple[str, bo
 
         if group and group[-1].indent != declaration.indent:
             flush_group()
+        if group and group[-1].kind != declaration.kind:
+            flush_group()
         group.append(declaration)
 
     flush_group()
@@ -217,8 +231,27 @@ def _parse_declaration_line(line: str) -> DeclarationLine | None:
         return None
 
     stripped_code = code.strip()
-    if any(char in stripped_code for char in _UNSUPPORTED_DECLARATION_CHARS):
-        return None
+    parameter_match = _PARAMETER_RE.match(stripped_code)
+    if parameter_match:
+        return DeclarationLine(
+            kind="parameter",
+            indent=indent,
+            declaration_type=parameter_match.group("type").rstrip(" \t"),
+            name=parameter_match.group("name"),
+            tail=_normalize_tail(parameter_match.group("tail")),
+            comment=comment,
+        )
+
+    assign_match = _ASSIGN_RE.match(stripped_code)
+    if assign_match:
+        return DeclarationLine(
+            kind="assign",
+            indent=indent,
+            declaration_type=assign_match.group("type"),
+            name=re.sub(r"\s+", "", assign_match.group("name")),
+            tail=_normalize_assign_tail(assign_match.group("tail")),
+            comment=comment,
+        )
 
     declaration_match = _DECLARATION_RE.match(stripped_code)
     if not declaration_match:
@@ -226,31 +259,37 @@ def _parse_declaration_line(line: str) -> DeclarationLine | None:
 
     declaration_type = declaration_match.group("type").rstrip(" \t")
     name = re.sub(r"\s+", "", declaration_match.group("name"))
-    terminator = declaration_match.group("terminator")
+    tail = declaration_match.group("tail")
     first_type_token = declaration_type.split(None, 1)[0].lower()
 
+    if any(char in stripped_code for char in _UNSUPPORTED_DECLARATION_CHARS):
+        return None
     if first_type_token in _NON_DECLARATION_PREFIXES:
         return None
-    if terminator == "" and comment is None and first_type_token not in _DECLARATION_PREFIXES:
+    if tail == "" and comment is None and first_type_token not in _DECLARATION_PREFIXES:
         return None
     if "," in declaration_type or ";" in declaration_type:
         return None
 
     return DeclarationLine(
+        kind="declaration",
         indent=indent,
         declaration_type=declaration_type,
         name=name,
-        terminator=terminator,
+        tail=tail,
         comment=comment,
     )
 
 
 def _align_declaration_group(group: list[DeclarationLine], tab_size: int) -> list[str]:
+    if group[0].kind == "assign":
+        return _align_assign_group(group, tab_size)
+
     type_width = max(len(line.declaration_type) for line in group)
     name_column = _next_aligned_column(type_width, tab_size)
 
     declaration_widths = [
-        name_column + len(line.name) + len(line.terminator)
+        name_column + len(line.name) + len(line.tail)
         for line in group
     ]
     comment_column = _next_aligned_column(max(declaration_widths), tab_size)
@@ -258,7 +297,7 @@ def _align_declaration_group(group: list[DeclarationLine], tab_size: int) -> lis
     aligned: list[str] = []
     for line, declaration_width in zip(group, declaration_widths):
         type_padding = " " * (name_column - len(line.declaration_type))
-        declaration = f"{line.declaration_type}{type_padding}{line.name}{line.terminator}"
+        declaration = f"{line.declaration_type}{type_padding}{line.name}{line.tail}"
 
         if line.comment is not None:
             comment_padding = " " * (comment_column - declaration_width)
@@ -267,6 +306,47 @@ def _align_declaration_group(group: list[DeclarationLine], tab_size: int) -> lis
         aligned.append(f"{line.indent}{declaration}")
 
     return aligned
+
+
+def _align_assign_group(group: list[DeclarationLine], tab_size: int) -> list[str]:
+    name_prefix = "assign "
+    tail_column = _next_aligned_column(
+        max(len(name_prefix) + len(line.name) for line in group),
+        tab_size,
+    )
+    statement_widths = [
+        tail_column + len(line.tail)
+        for line in group
+    ]
+    comment_column = _next_aligned_column(max(statement_widths), tab_size)
+
+    aligned: list[str] = []
+    for line, statement_width in zip(group, statement_widths):
+        name_end = len(name_prefix) + len(line.name)
+        tail_padding = " " * (tail_column - name_end)
+        statement = f"{name_prefix}{line.name}{tail_padding}{line.tail}"
+
+        if line.comment is not None:
+            comment_padding = " " * (comment_column - statement_width)
+            statement = f"{statement}{comment_padding}{line.comment}"
+
+        aligned.append(f"{line.indent}{statement}")
+
+    return aligned
+
+
+def _normalize_tail(tail: str) -> str:
+    stripped = tail.strip()
+    if stripped.startswith("="):
+        return " = " + stripped[1:].strip()
+    return stripped
+
+
+def _normalize_assign_tail(tail: str) -> str:
+    stripped = tail.strip()
+    if stripped.startswith("="):
+        return "= " + stripped[1:].strip()
+    return stripped
 
 
 def _next_tab_stop(column: int, tab_size: int) -> int:
