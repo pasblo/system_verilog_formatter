@@ -137,6 +137,7 @@ _DECLARATION_PREFIXES = {
     "realtime",
     "shortreal",
     "parameter",
+    "assign",
 }
 
 _NON_DECLARATION_PREFIXES = {
@@ -144,7 +145,6 @@ _NON_DECLARATION_PREFIXES = {
     "always_comb",
     "always_ff",
     "always_latch",
-    "assign",
     "begin",
     "case",
     "casex",
